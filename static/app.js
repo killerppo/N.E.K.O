@@ -567,36 +567,10 @@ function init_app() {
                             : '';
                         const trimmed = rest.replace(/^\s+/, '').replace(/\s+$/, '');
                         if (trimmed) {
-                            const messageDiv = document.createElement('div');
-                            messageDiv.classList.add('message', 'gemini');
-                            const timeStr = new Date().toLocaleTimeString('en-US', {
-                                hour12: false,
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit'
-                            });
-                            messageDiv.textContent = `[${timeStr}] 🎀 ${trimmed}`;
-                            chatContainer.appendChild(messageDiv);
-                            try {
-                                chatContainer.scrollTop = chatContainer.scrollHeight;
-                            } catch (_) { }
-                            window.currentGeminiMessage = messageDiv;
+                            window._realisticGeminiQueue = window._realisticGeminiQueue || [];
+                            window._realisticGeminiQueue.push(trimmed);
                             window._realisticGeminiBuffer = '';
-
-                            // 与正常气泡创建行为保持一致：字幕提示 & 首次对话成就
-                            try {
-                                checkAndShowSubtitlePrompt(trimmed);
-                            } catch (e) {
-                                console.warn('turn end flush subtitle prompt failed:', e);
-                            }
-                            if (typeof isFirstAIResponse !== 'undefined' && isFirstAIResponse) {
-                                isFirstAIResponse = false;
-                                try {
-                                    checkAndUnlockFirstDialogueAchievement();
-                                } catch (e) {
-                                    console.warn('turn end flush first-dialogue achievement failed:', e);
-                                }
-                            }
+                            processRealisticQueue();
                         }
                     } catch (e) {
                         console.warn('turn end flush realistic buffer failed:', e);
@@ -779,6 +753,62 @@ function init_app() {
         }
     });
 
+    function getCurrentTimeString() {
+        return new Date().toLocaleTimeString('en-US', {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+
+    function createGeminiBubble(sentence) {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', 'gemini');
+        messageDiv.textContent = "[" + getCurrentTimeString() + "] 🎀 " + sentence;
+        chatContainer.appendChild(messageDiv);
+        window.currentGeminiMessage = messageDiv;
+
+        // 检测AI消息的语言，如果与用户语言不同，显示字幕提示框
+        checkAndShowSubtitlePrompt(sentence);
+
+        // 如果是AI第一次回复，更新状态并检查成就
+        if (isFirstAIResponse) {
+            isFirstAIResponse = false;
+            console.log('检测到AI第一次回复');
+            checkAndUnlockFirstDialogueAchievement();
+        }
+    }
+
+    async function processRealisticQueue() {
+        if (window._isProcessingRealisticQueue) return;
+        window._isProcessingRealisticQueue = true;
+
+        try {
+            while (window._realisticGeminiQueue && window._realisticGeminiQueue.length > 0) {
+                // 基于时间戳的延迟：确保每句之间至少间隔2秒
+                const now = Date.now();
+                const timeSinceLastBubble = now - (window._lastBubbleTime || 0);
+                if (window._lastBubbleTime > 0 && timeSinceLastBubble < 2000) {
+                    await new Promise(resolve => setTimeout(resolve, 2000 - timeSinceLastBubble));
+                }
+
+                const s = window._realisticGeminiQueue.shift();
+                if (s) {
+                    createGeminiBubble(s);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    window._lastBubbleTime = Date.now();
+                }
+            }
+        } finally {
+            window._isProcessingRealisticQueue = false;
+            // 兜底检查：如果在循环结束到重置标志位之间又有新消息进入队列，递归触发
+            if (window._realisticGeminiQueue && window._realisticGeminiQueue.length > 0) {
+                processRealisticQueue();
+            }
+        }
+    }
+
     // 添加消息到聊天界面
     function appendMessage(text, sender, isNewMessage = true) {
         function isMergeMessagesEnabled() {
@@ -823,33 +853,6 @@ function init_app() {
             return { sentences, rest };
         }
 
-        function createGeminiBubble(sentence) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message', 'gemini');
-            messageDiv.textContent = "[" + getCurrentTimeString() + "] 🎀 " + sentence;
-            chatContainer.appendChild(messageDiv);
-            window.currentGeminiMessage = messageDiv;
-
-            // 检测AI消息的语言，如果与用户语言不同，显示字幕提示框
-            checkAndShowSubtitlePrompt(sentence);
-
-            // 如果是AI第一次回复，更新状态并检查成就
-            if (isFirstAIResponse) {
-                isFirstAIResponse = false;
-                console.log('检测到AI第一次回复');
-                checkAndUnlockFirstDialogueAchievement();
-            }
-        }
-
-        function getCurrentTimeString() {
-            return new Date().toLocaleTimeString('en-US', {
-                hour12: false,
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-        }
-
         // 维护“本轮 AI 回复”的完整文本（用于 turn end 时整段翻译/情感分析）
         if (sender === 'gemini') {
             if (isNewMessage) {
@@ -863,16 +866,24 @@ function init_app() {
             // 拟真输出（合并消息关闭）：流式内容先缓冲，按句号/问号/感叹号/换行等切分，每句一个气泡
             if (isNewMessage) {
                 window._realisticGeminiBuffer = '';
+                window._realisticGeminiQueue = []; // 新一轮开始时，清空队列
+                window._lastBubbleTime = 0; // 重置时间戳，第一句立即显示
             }
             const prev = typeof window._realisticGeminiBuffer === 'string' ? window._realisticGeminiBuffer : '';
             const combined = prev + normalizeGeminiText(text);
             const { sentences, rest } = splitIntoSentences(combined);
             window._realisticGeminiBuffer = rest;
 
-            sentences.forEach(s => createGeminiBubble(s));
+            if (sentences.length > 0) {
+                window._realisticGeminiQueue = window._realisticGeminiQueue || [];
+                window._realisticGeminiQueue.push(...sentences);
+                processRealisticQueue();
+            }
         } else if (sender === 'gemini' && isMergeMessagesEnabled() && isNewMessage) {
             // 合并消息开启：新一轮开始时，清空拟真缓冲，防止残留
             window._realisticGeminiBuffer = '';
+            window._realisticGeminiQueue = [];
+            window._lastBubbleTime = 0;
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message', 'gemini');
             messageDiv.textContent = "[" + getCurrentTimeString() + "] 🎀 " + (text || '');
