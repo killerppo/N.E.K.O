@@ -503,13 +503,15 @@ function init_app() {
                 });
             }
 
-            // 更新本轮完整文本缓存，确保后续逻辑使用精简内容
-            window._geminiTurnFullText = typeof response.text === 'string' ? response.text : '';
+                    const displayText = typeof response.text === 'string'
+                        ? response.text
+                        : (typeof window._geminiTurnFullText === 'string' ? window._geminiTurnFullText : '');
+                    window._geminiTurnFullText = displayText;
                 
-                // 添加唯一一个精简气泡
-                const messageDiv = document.createElement('div');
-                messageDiv.classList.add('message', 'gemini');
-                messageDiv.textContent = "[" + getCurrentTimeString() + "] 🎀 " + response.text;
+                    // 添加唯一一个精简气泡
+                    const messageDiv = document.createElement('div');
+                    messageDiv.classList.add('message', 'gemini');
+                    messageDiv.textContent = "[" + getCurrentTimeString() + "] 🎀 " + displayText;
                     chatContainer.appendChild(messageDiv);
                     window.currentGeminiMessage = messageDiv;
                     window.currentTurnGeminiBubbles = [messageDiv];
