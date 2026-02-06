@@ -26,7 +26,7 @@ from queue import Queue
 from uuid import uuid4
 import numpy as np
 import soxr
-import httpx 
+import httpx
 
 # Setup logger for this module
 logger = logging.getLogger(__name__)
@@ -147,6 +147,9 @@ class LLMSessionManager:
         # 用户活动时间戳：用于主动搭话检测最近是否有用户输入
         self.last_user_activity_time = None  # float timestamp or None
         
+        # 累积本轮完整文本（用于前端显示追踪，实际改写逻辑在 omni_offline_client.py）
+        self._current_turn_text = ''
+        
         # 用户语言设置（从前端获取）
         self.user_language = 'zh-CN'  # 默认中文
         # 翻译服务（延迟初始化）
@@ -188,6 +191,13 @@ class LLMSessionManager:
 
     async def handle_text_data(self, text: str, is_first_chunk: bool = False):
         """文本回调：处理文本显示和TTS（用于文本模式）"""
+        
+        # ========== 新增：累积本轮完整文本 ==========
+        if is_first_chunk:
+            self._current_turn_text = ''
+        self._current_turn_text += text
+        # ========== 累积结束 ==========
+        
         # 如果是新消息的第一个chunk，清空TTS队列和缓存以打断之前的语音
         if is_first_chunk and self.use_tts:
             async with self.tts_cache_lock:
@@ -222,6 +232,10 @@ class LLMSessionManager:
 
     async def handle_response_complete(self):
         """Qwen完成回调：用于处理Core API的响应完成事件，包含TTS和热切换逻辑"""
+        
+        # 重置本轮文本累积（改写逻辑已移至 omni_offline_client.py）
+        self._current_turn_text = ''
+        
         # 预热期间跳过TTS信号发送（避免local TTS收到空包产生参考prompt音频）
         if self._is_warmup_in_progress:
             logger.debug("⏭️ 跳过预热期间的TTS信号发送")
@@ -251,6 +265,44 @@ class LLMSessionManager:
                 await self._trigger_immediate_preparation_for_extra()
         except Exception as e:
             logger.error(f"💥 Extra reply preparation error: {e}")
+
+    async def handle_response_rewritten(self, rewritten_text: str, original_length: int, rewritten_length: int):
+        """
+        处理改写完成的回调：发送消息到前端替换显示，并通知 cross_server 更新记忆
+        
+        Args:
+            rewritten_text: 改写后的文本
+            original_length: 原始字数
+            rewritten_length: 改写后字数
+        """
+        logger.info(f"[{self.lanlan_name}] 改写成功: {original_length} -> {rewritten_length} 字")
+        
+        # 1. 通知前端替换显示
+        if self.websocket and hasattr(self.websocket, 'client_state'):
+            try:
+                await self.websocket.send_json({
+                    "type": "response_rewritten",
+                    "text": rewritten_text,
+                    "original_length": original_length,
+                    "rewritten_length": rewritten_length
+                })
+            except Exception as e:
+                logger.warning(f"发送改写结果到前端失败: {e}")
+        
+        # 2. 通知 cross_server 用改写后的文本替换记忆中的原文
+        #    通过 sync_message_queue 发送一条 system 消息，cross_server 会在
+        #    message["type"] == "system" 分支中接收并更新 text_output_cache
+        try:
+            if hasattr(self, "sync_message_queue") and self.sync_message_queue is not None:
+                self.sync_message_queue.put({
+                    "type": "system",
+                    "data": "response_rewritten_for_memory",
+                    "text": rewritten_text
+                })
+            else:
+                logger.warning("发送改写结果到 cross_server 失败: sync_message_queue 不可用")
+        except Exception as e:
+            logger.warning(f"发送改写结果到 cross_server 失败: {e}")
         
         # 如果正在热切换过程中，跳过所有热切换逻辑
         if self.is_hot_swap_imminent:
@@ -878,6 +930,14 @@ class LLMSessionManager:
                     on_response_done=self.handle_response_complete,
                     on_repetition_detected=self.handle_repetition_detected
                 )
+                # ========== 配置改写模型和回调 ==========
+                self.session.rewrite_model_config = {
+                    'model': correction_config.get('model', 'qwen-max'),
+                    'base_url': correction_config.get('base_url', ''),
+                    'api_key': correction_config.get('api_key', ''),
+                }
+                self.session.on_response_rewritten = self.handle_response_rewritten
+                # ========== 配置结束 ==========
             else:
                 # 语音模式：使用 OmniRealtimeClient
                 realtime_config = self._config_manager.get_model_api_config('realtime')
@@ -1129,6 +1189,14 @@ class LLMSessionManager:
                     on_connection_error=self.handle_connection_error,
                     on_response_done=self.handle_response_complete
                 )
+                # ========== 配置改写模型和回调 ==========
+                self.pending_session.rewrite_model_config = {
+                    'model': correction_config.get('model', 'qwen-max'),
+                    'base_url': correction_config.get('base_url', ''),
+                    'api_key': correction_config.get('api_key', ''),
+                }
+                self.pending_session.on_response_rewritten = self.handle_response_rewritten
+                # ========== 配置结束 ==========
                 logger.info("🔄 热切换准备: 创建文本模式 OmniOfflineClient")
             else:
                 # 语音模式：使用 OmniRealtimeClient
