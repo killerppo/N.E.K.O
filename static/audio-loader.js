@@ -160,7 +160,10 @@ class AudioManager {
 
     /** 设置扬声器音量 (0~100) */
     setVolume(percent) {
-        const val = Math.max(0, Math.min(100, percent)) / 100;
+        // 验证并强制转换为数字，非有效数字时默认为 0
+        const numPercent = Number.isFinite(percent) ? percent : (Number.isFinite(Number(percent)) ? Number(percent) : 0);
+        // 限制在 0~100 范围内，转换为 0~1
+        const val = Math.max(0, Math.min(100, numPercent)) / 100;
         if (this.masterGain) {
             this.masterGain.gain.setTargetAtTime(val, this.ctx.currentTime, 0.05);
         }
