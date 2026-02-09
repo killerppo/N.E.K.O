@@ -27,14 +27,12 @@ class AudioManager {
         if (!this.masterGain) {
             this.masterGain = this.ctx.createGain();
             this.masterGain.connect(this.ctx.destination);
-            // 从 localStorage 恢复上次的扬声器音量
-            const saved = localStorage.getItem('neko_speaker_volume');
-            if (saved !== null) {
-                const vol = parseInt(saved, 10);
-                if (!isNaN(vol) && vol >= 0 && vol <= 100) {
-                    this.masterGain.gain.value = vol / 100;
-                }
-            }
+            // 使用 app.js 中已加载的 speakerVolume，避免重复读取 localStorage
+            // 如果 app.js 的 getSpeakerVolume 可用，使用它；否则默认 100%
+            const vol = (typeof window.getSpeakerVolume === 'function')
+                ? window.getSpeakerVolume()
+                : 100;
+            this.masterGain.gain.value = vol / 100;
         }
         // 任何依赖 ctx 的 Graph 也可以在这里补建
         for (const [id, m] of this.models) {

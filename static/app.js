@@ -1850,6 +1850,12 @@ function init_app() {
                 }
             } else {
                 console.log(`未找到扬声器音量设置，使用默认值 ${DEFAULT_SPEAKER_VOLUME}%`);
+                speakerVolume = DEFAULT_SPEAKER_VOLUME;
+            }
+
+            // 立即应用到 AudioManager（如果已初始化）
+            if (window.AM && typeof window.AM.setVolume === 'function') {
+                window.AM.setVolume(speakerVolume);
             }
         } catch (err) {
             console.error('加载扬声器音量设置失败:', err);
