@@ -274,8 +274,14 @@ class LLMSessionManager:
                 })
             except Exception as e:
                 logger.warning(f"发送 response_discarded 到前端失败: {e}")
-        
-        # turn end will由 handle_response_complete 统一发送
+
+        if self.sync_message_queue:
+            self.sync_message_queue.put({
+                'type': 'system',
+                'data': 'response_discarded_clear'
+            })
+
+        # turn end will 由 handle_response_complete 统一发送
 
 
     async def handle_audio_data(self, audio_data: bytes):

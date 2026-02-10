@@ -236,6 +236,10 @@ def sync_connector_process(message_queue, shutdown_event, lanlan_name, sync_serv
                                         {'type': 'text', 'text': "网络错误，您已断开连接！"}]})
                                 text_output_cache = ''
                             
+                            elif message["data"] == "response_discarded_clear":
+                                logger.debug(f"[{lanlan_name}] 收到 response_discarded_clear，清空当前输出缓存")
+                                text_output_cache = ''
+                            
                             if message["data"] == "renew session":
                                 # 检查是否正在关闭
                                 if shutdown_event.is_set():
