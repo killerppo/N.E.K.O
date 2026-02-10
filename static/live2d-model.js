@@ -768,9 +768,13 @@ Live2DManager.prototype.applyModelSettings = function(model, options) {
             const rendererWidth = this.pixi_app.renderer.width;
             const rendererHeight = this.pixi_app.renderer.height;
 
+            // 验证渲染器尺寸是否有效（避免除以零或无效值导致模型崩溃）
+            const hasValidRenderer = Number.isFinite(rendererWidth) && Number.isFinite(rendererHeight) &&
+                rendererWidth > 0 && rendererHeight > 0;
+
             // 检查是否有保存的视口信息（用于跨分辨率归一化）
             const savedViewport = preferences.viewport;
-            const hasViewport = savedViewport &&
+            const hasViewport = hasValidRenderer && savedViewport &&
                 Number.isFinite(savedViewport.width) && Number.isFinite(savedViewport.height) &&
                 savedViewport.width > 0 && savedViewport.height > 0;
 
