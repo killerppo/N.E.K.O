@@ -862,9 +862,9 @@ class LLMSessionManager:
                     on_output_transcript=self.handle_output_transcript,
                     on_connection_error=self.handle_connection_error,
                     on_response_done=self.handle_response_complete,
-                    on_repetition_detected=self.handle_repetition_detected
+                    on_repetition_detected=self.handle_repetition_detected,
+                    on_response_discarded=self.handle_response_discarded
                 )
-                self.session.on_response_discarded = self.handle_response_discarded
             else:
                 # 语音模式：使用 OmniRealtimeClient
                 realtime_config = self._config_manager.get_model_api_config('realtime')
@@ -1114,9 +1114,10 @@ class LLMSessionManager:
                     on_input_transcript=self.handle_input_transcript,
                     on_output_transcript=self.handle_output_transcript,
                     on_connection_error=self.handle_connection_error,
-                    on_response_done=self.handle_response_complete
+                    on_response_done=self.handle_response_complete,
+                    on_repetition_detected=self.handle_repetition_detected,
+                    on_response_discarded=self.handle_response_discarded
                 )
-                self.pending_session.on_response_discarded = self.handle_response_discarded
                 logger.info("🔄 热切换准备: 创建文本模式 OmniOfflineClient")
             else:
                 # 语音模式：使用 OmniRealtimeClient

@@ -64,6 +64,7 @@ class OmniOfflineClient:
         on_connection_error: Optional[Callable[[str], Awaitable[None]]] = None,
         on_response_done: Optional[Callable[[], Awaitable[None]]] = None,
         on_repetition_detected: Optional[Callable[[], Awaitable[None]]] = None,
+        on_response_discarded: Optional[Callable[[str, int, int, bool, Optional[str]], Awaitable[None]]] = None,
         extra_event_handlers: Optional[Dict[str, Callable[[Dict[str, Any]], Awaitable[None]]]] = None
     ):
         # Use base_url directly without conversion
@@ -80,6 +81,7 @@ class OmniOfflineClient:
         self.handle_connection_error = on_connection_error
         self.on_response_done = on_response_done
         self.on_repetition_detected = on_repetition_detected
+        self.on_response_discarded = on_response_discarded
         
         # Initialize langchain ChatOpenAI client
         self.llm = ChatOpenAI(
@@ -109,7 +111,6 @@ class OmniOfflineClient:
         self.max_response_rerolls = 2         # 最多允许的自动重试次数
         
         # 质量守卫回调：由 core.py 设置，用于通知前端清理气泡
-        self.on_response_discarded: Optional[Callable[[str, int, int, bool, Optional[str]], Awaitable[None]]] = None
         
     async def connect(self, instructions: str, native_audio=False) -> None:
         """Initialize the client with system instructions."""
