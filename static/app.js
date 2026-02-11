@@ -3047,7 +3047,7 @@ function init_app() {
                 if (toggleChatBtn) {
                     const iconImg = toggleChatBtn.querySelector('img');
                     if (iconImg) {
-                        iconImg.src = '/static/icons/expand_icon.png';
+                        iconImg.src = '/static/icons/expand_icon_off.png';
                         iconImg.alt = window.t ? window.t('common.minimize') : '最小化';
                     }
                     toggleChatBtn.title = window.t ? window.t('common.minimize') : '最小化';
@@ -4698,7 +4698,7 @@ function init_app() {
             if (toggleChatBtn) {
                 const iconImg = toggleChatBtn.querySelector('img');
                 if (iconImg) {
-                    iconImg.src = '/static/icons/expand_icon.png';
+                    iconImg.src = '/static/icons/expand_icon_off.png';
                     iconImg.alt = window.t ? window.t('common.expand') : '展开';
                 }
                 toggleChatBtn.title = window.t ? window.t('common.expand') : '展开';
@@ -4920,7 +4920,7 @@ function init_app() {
             if (toggleChatBtn) {
                 const iconImg = toggleChatBtn.querySelector('img');
                 if (iconImg) {
-                    iconImg.src = '/static/icons/expand_icon.png';
+                    iconImg.src = '/static/icons/expand_icon_off.png';
                     iconImg.alt = window.t ? window.t('common.minimize') : '最小化';
                 }
                 toggleChatBtn.title = window.t ? window.t('common.minimize') : '最小化';
