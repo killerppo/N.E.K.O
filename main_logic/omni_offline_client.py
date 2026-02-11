@@ -312,21 +312,20 @@ class OmniOfflineClient:
                             content = chunk.content if hasattr(chunk, 'content') else str(chunk)
                             
                             if content and content.strip():
-                                for char in content:
+                                truncated_content = content
+                                for idx, char in enumerate(content):
                                     if char == '|':
                                         pipe_count += 1
                                         if pipe_count >= 2:
-                                            pipe_positions = [i for i, c in enumerate(content) if c == '|']
-                                            if len(pipe_positions) >= 2:
-                                                content = content[:pipe_positions[1]]
+                                            truncated_content = content[:idx]
                                             fence_triggered = True
                                             logger.info("OmniOfflineClient: 围栏触发 - 检测到第二个 | 字符，截断输出")
                                             break
                                 
-                                if content and content.strip():
-                                    assistant_message += content
+                                if truncated_content and truncated_content.strip():
+                                    assistant_message += truncated_content
                                     if self.on_text_delta:
-                                        await self.on_text_delta(content, is_first_chunk)
+                                        await self.on_text_delta(truncated_content, is_first_chunk)
                                     is_first_chunk = False
                                     
                                     if self.enable_response_guard:
