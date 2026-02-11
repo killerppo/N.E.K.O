@@ -503,8 +503,8 @@ function init_app() {
 
                     window._geminiTurnFullText = '';
                     
-                    const retryMsg = window.t ? window.t('console.aiRetrying') : '网络抖动，正在重新生成…';
-                    const failMsg = window.t ? window.t('console.aiFailed') : '网络异常，本轮回复已放弃';
+                    const retryMsg = window.t ? window.t('console.aiRetrying') : '猫娘链接出现异常，校准中…';
+                    const failMsg = window.t ? window.t('console.aiFailed') : '猫娘链接出现异常';
                     showStatusToast(response.will_retry ? retryMsg : failMsg, 2500);
                     
                     if (!response.will_retry && response.message) {
