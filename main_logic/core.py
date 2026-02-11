@@ -158,6 +158,15 @@ class LLMSessionManager:
         self.last_audio_send_error_time = 0.0  # 上次音频发送错误的时间戳
         self.audio_error_log_interval = 2.0  # 音频错误log间隔（秒）
 
+    def _get_text_guard_max_length(self) -> int:
+        try:
+            value = int(self._config_manager.get_core_config().get('TEXT_GUARD_MAX_LENGTH', 200))
+            if value <= 0:
+                raise ValueError
+            return value
+        except Exception:
+            return 200
+
     async def handle_new_message(self):
         """处理新模型输出：清空TTS队列并通知前端"""
         # 重置音频重采样器状态（新轮次音频不应与上轮次连续）
@@ -826,8 +835,9 @@ class LLMSessionManager:
             return True
 
         # 定义 LLM Session 启动协程
-        async def start_llm_session():
-            """异步创建并连接 LLM Session"""
+            async def start_llm_session():
+                """异步创建并连接 LLM Session"""
+                guard_max_length = self._get_text_guard_max_length()
             # 获取初始 prompt
             initial_prompt = (f"你是一个角色扮演大师，并且精通电脑操作。请按要求扮演以下角色（{self.lanlan_name}），并在对方请求时、回答'我试试'并尝试操纵电脑。" if self._is_agent_enabled() else f"你是一个角色扮演大师。请按要求扮演以下角色（{self.lanlan_name}）。") + self.lanlan_prompt
             
@@ -863,7 +873,8 @@ class LLMSessionManager:
                     on_connection_error=self.handle_connection_error,
                     on_response_done=self.handle_response_complete,
                     on_repetition_detected=self.handle_repetition_detected,
-                    on_response_discarded=self.handle_response_discarded
+                    on_response_discarded=self.handle_response_discarded,
+                    max_response_length=guard_max_length
                 )
             else:
                 # 语音模式：使用 OmniRealtimeClient
@@ -1103,6 +1114,7 @@ class LLMSessionManager:
                 # 文本模式：使用 OmniOfflineClient
                 correction_config = self._config_manager.get_model_api_config('correction')
                 vision_config = self._config_manager.get_model_api_config('vision')
+                guard_max_length = self._get_text_guard_max_length()
                 self.pending_session = OmniOfflineClient(
                     base_url=correction_config['base_url'],
                     api_key=correction_config['api_key'],
@@ -1116,7 +1128,8 @@ class LLMSessionManager:
                     on_connection_error=self.handle_connection_error,
                     on_response_done=self.handle_response_complete,
                     on_repetition_detected=self.handle_repetition_detected,
-                    on_response_discarded=self.handle_response_discarded
+                    on_response_discarded=self.handle_response_discarded,
+                    max_response_length=guard_max_length
                 )
                 logger.info("🔄 热切换准备: 创建文本模式 OmniOfflineClient")
             else:

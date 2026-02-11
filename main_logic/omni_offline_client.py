@@ -65,7 +65,8 @@ class OmniOfflineClient:
         on_response_done: Optional[Callable[[], Awaitable[None]]] = None,
         on_repetition_detected: Optional[Callable[[], Awaitable[None]]] = None,
         on_response_discarded: Optional[Callable[[str, int, int, bool, Optional[str]], Awaitable[None]]] = None,
-        extra_event_handlers: Optional[Dict[str, Callable[[Dict[str, Any]], Awaitable[None]]]] = None
+        extra_event_handlers: Optional[Dict[str, Callable[[Dict[str, Any]], Awaitable[None]]]] = None,
+        max_response_length: Optional[int] = None
     ):
         # Use base_url directly without conversion
         self.base_url = base_url
@@ -107,7 +108,7 @@ class OmniOfflineClient:
         
         # ========== 普通对话守卫配置 ==========
         self.enable_response_guard = True     # 是否启用质量守卫
-        self.max_response_length = 200        # 触发截断/重 roll 的字数阈值
+        self.max_response_length = max_response_length if isinstance(max_response_length, int) and max_response_length > 0 else 200
         self.max_response_rerolls = 2         # 最多允许的自动重试次数
         
         # 质量守卫回调：由 core.py 设置，用于通知前端清理气泡
